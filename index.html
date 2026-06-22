@@ -307,9 +307,14 @@ async function saveConfig(){
   };
   try {
     setSS(true,"Guardando...");
-    await sbFetch("s5_config?id=eq.main",{method:"PATCH",body:JSON.stringify(payload),xh:{"Prefer":"return=minimal"}});
+    var pSize=JSON.stringify(payload).length;
+    var r=await sbFetch("s5_config?id=eq.main",{method:"PATCH",body:JSON.stringify(payload),xh:{"Prefer":"return=minimal"}});
+    if(!r.ok){throw new Error("HTTP "+r.status+" al guardar (tamano payload: "+Math.round(pSize/1024)+" KB)");}
     setSS(true,"Guardado");
-  } catch(e){setSS(false,"Error al guardar");}
+  } catch(e){
+    setSS(false,"Error al guardar");
+    alert("⚠ No se pudo guardar la configuracion.\n\n"+(e.message||e)+"\n\nLos ultimos cambios pueden perderse al refrescar. Revisa tu conexion o el tamano de las imagenes de layout cargadas.");
+  }
 }
 
 async function saveAction(zona,mes,act){
@@ -751,10 +756,10 @@ function loadMapImg(){
     var img=new Image(),rd=new FileReader();
     rd.onload=function(e){
       img.onload=function(){
-        var maxW=1600,scale=Math.min(1,maxW/img.width);
+        var maxW=1100,scale=Math.min(1,maxW/img.width);
         var cv=document.createElement("canvas");cv.width=img.width*scale;cv.height=img.height*scale;
         cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
-        tc().mapImg=cv.toDataURL("image/jpeg",0.85);
+        tc().mapImg=cv.toDataURL("image/jpeg",0.7);
         saveConfig();rMapa();
       };img.src=e.target.result;
     };rd.readAsDataURL(f);
