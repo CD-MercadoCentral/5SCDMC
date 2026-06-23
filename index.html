@@ -297,12 +297,14 @@ async function loadFromSupa(){
 
 async function saveConfig(){
   if(IS_VIEWER)return;
+  // Lightweight payload: zones/rects/sched/cfg only - NEVER includes map images,
+  // so deleting/editing a zone can't fail due to image payload size.
   var payload={
     id:"main",
     zones:ST.cfg_CMQ.zones, rects:ST.cfg_CMQ.rects, sched:ST.cfg_CMQ.sched,
-    cfg:ST.cfg_CMQ.cfg, map_img:ST.cfg_CMQ.mapImg||null,
+    cfg:ST.cfg_CMQ.cfg,
     zones_ol:ST.cfg_OL.zones, rects_ol:ST.cfg_OL.rects, sched_ol:ST.cfg_OL.sched,
-    cfg_ol:ST.cfg_OL.cfg, map_img_ol:ST.cfg_OL.mapImg||null,
+    cfg_ol:ST.cfg_OL.cfg,
     updated_at:new Date().toISOString()
   };
   try {
@@ -313,7 +315,24 @@ async function saveConfig(){
     setSS(true,"Guardado");
   } catch(e){
     setSS(false,"Error al guardar");
-    alert("⚠ No se pudo guardar la configuracion.\n\n"+(e.message||e)+"\n\nLos ultimos cambios pueden perderse al refrescar. Revisa tu conexion o el tamano de las imagenes de layout cargadas.");
+    alert("⚠ No se pudo guardar la configuracion.\n\n"+(e.message||e)+"\n\nLos ultimos cambios pueden perderse al refrescar. Revisa tu conexion.");
+  }
+}
+async function saveMapImg(team){
+  // Separate, dedicated save for the layout image - kept apart from saveConfig
+  // so a large image never blocks zone/owner edits.
+  var field=team==="OL"?"map_img_ol":"map_img";
+  var val=team==="OL"?(ST.cfg_OL.mapImg||null):(ST.cfg_CMQ.mapImg||null);
+  var payload={};payload[field]=val;payload.updated_at=new Date().toISOString();
+  try {
+    setSS(true,"Guardando imagen...");
+    var pSize=JSON.stringify(payload).length;
+    var r=await sbFetch("s5_config?id=eq.main",{method:"PATCH",body:JSON.stringify(payload),xh:{"Prefer":"return=minimal"}});
+    if(!r.ok){throw new Error("HTTP "+r.status+" al guardar imagen (tamano: "+Math.round(pSize/1024)+" KB)");}
+    setSS(true,"Guardado");
+  } catch(e){
+    setSS(false,"Error al guardar imagen");
+    alert("⚠ No se pudo guardar la imagen del layout.\n\n"+(e.message||e)+"\n\nProba con una imagen mas chica o de menor calidad.");
   }
 }
 
@@ -756,11 +775,11 @@ function loadMapImg(){
     var img=new Image(),rd=new FileReader();
     rd.onload=function(e){
       img.onload=function(){
-        var maxW=1100,scale=Math.min(1,maxW/img.width);
+        var maxW=700,scale=Math.min(1,maxW/img.width);
         var cv=document.createElement("canvas");cv.width=img.width*scale;cv.height=img.height*scale;
         cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
-        tc().mapImg=cv.toDataURL("image/jpeg",0.7);
-        saveConfig();rMapa();
+        tc().mapImg=cv.toDataURL("image/jpeg",0.5);
+        saveMapImg(ST.team);rMapa();
       };img.src=e.target.result;
     };rd.readAsDataURL(f);
   };inp.click();
