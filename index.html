@@ -1368,23 +1368,33 @@ function rAcc(){
   // Get unique responsables and areas for filters
   var respFilter=ST._accResp||"(Todos)";
   var areaFilter=ST._accArea||"(Todos)";
+  var statusFilter=ST._accStatus!==undefined?ST._accStatus:"Pendientes"; // default: show only open+in-progress
   var resps=["(Todos)"].concat([...new Set(all.map(function(a){return a.who||"";}))].filter(function(v){return v&&v!=="(Todos)";}).sort());
   var areas=["(Todos)"].concat([...new Set(all.map(function(a){return a.area||"";}))].filter(function(v){return v&&v!=="(Todos)";}).sort());
   if(respFilter!=="(Todos)")filtered=filtered.filter(function(a){return a.who===respFilter;});
   if(areaFilter!=="(Todos)")filtered=filtered.filter(function(a){return a.area===areaFilter;});
+  // counts computed BEFORE status filter, so KPI cards always show true totals for the period
   var open=filtered.filter(function(a){return a.status==="Abierta";}).length;
   var inp=filtered.filter(function(a){return a.status==="En progreso";}).length;
   var done=filtered.filter(function(a){return a.status==="Cerrada";}).length;
+  // Apply status filter last
+  if(statusFilter==="Pendientes")filtered=filtered.filter(function(a){return a.status==="Abierta"||a.status==="En progreso";});
+  else if(statusFilter!=="(Todas)")filtered=filtered.filter(function(a){return a.status===statusFilter;});
   var h="<div class='filter-row' style='margin-bottom:10px'>";
   h+="<span style='font-size:12px;color:#64748b'>Periodo: <strong style='color:#e2e8f0'>"+lbl+"</strong></span>";
   h+="<select class='filter-sel' onchange='ST._accResp=this.value;rAcc()'>"+resps.map(function(r){return"<option value='"+esc(r)+"'"+(r===respFilter?" selected":"")+">"+r+"</option>";}).join("")+"</select>";
   h+="<select class='filter-sel' onchange='ST._accArea=this.value;rAcc()'>"+areas.map(function(a){return"<option value='"+esc(a)+"'"+(a===areaFilter?" selected":"")+">"+a+"</option>";}).join("")+"</select>";
+  h+="<select class='filter-sel' onchange='ST._accStatus=this.value;rAcc()'>";
+  [["Pendientes","Pendientes (abiertas + en progreso)"],["(Todas)","Todas"],["Abierta","Solo abiertas"],["En progreso","Solo en progreso"],["Cerrada","Solo cerradas"],["Vencida","Solo vencidas"]].forEach(function(opt){
+    h+="<option value='"+opt[0]+"'"+(statusFilter===opt[0]?" selected":"")+">"+opt[1]+"</option>";
+  });
+  h+="</select>";
   h+="<span style='font-size:11px;color:#64748b'>"+filtered.length+" acciones"+(all.length>filtered.length?" / "+all.length+" total":"")+"</span>";
   h+="</div>";
   h+="<div class='g3' style='margin-bottom:10px'>";
-  h+="<div class='kpi'><div class='v' style='color:#ef4444'>"+open+"</div><div class='l'>Abiertas</div></div>";
-  h+="<div class='kpi'><div class='v' style='color:#f59e0b'>"+inp+"</div><div class='l'>En progreso</div></div>";
-  h+="<div class='kpi'><div class='v' style='color:#22c55e'>"+done+"</div><div class='l'>Cerradas</div></div>";
+  h+="<div class='kpi kpi-clickable' data-status='Abierta' style='cursor:pointer'><div class='v' style='color:#ef4444'>"+open+"</div><div class='l'>Abiertas</div></div>";
+  h+="<div class='kpi kpi-clickable' data-status='En progreso' style='cursor:pointer'><div class='v' style='color:#f59e0b'>"+inp+"</div><div class='l'>En progreso</div></div>";
+  h+="<div class='kpi kpi-clickable' data-status='Cerrada' style='cursor:pointer'><div class='v' style='color:#22c55e'>"+done+"</div><div class='l'>Cerradas</div></div>";
   h+="</div>";
   h+="<div class='card'>";
   if(!filtered.length){
@@ -1407,7 +1417,15 @@ function rAcc(){
   }
   h+="</div>";
   document.getElementById("ct").innerHTML=h;
-  document.getElementById("ct").addEventListener("click",function(e){var row=e.target.closest(".acc-row");if(row)openZone(row.getAttribute("data-z"));});
+  document.getElementById("ct").addEventListener("click",function(e){
+    var row=e.target.closest(".acc-row");if(row){openZone(row.getAttribute("data-z"));return;}
+    var kpi=e.target.closest(".kpi-clickable");
+    if(kpi){
+      var st=kpi.getAttribute("data-status");
+      ST._accStatus=(ST._accStatus===st)?"(Todas)":st; // click again to clear filter
+      rAcc();
+    }
+  });
 }
 
 // ── CRONOGRAMA ───────────────────────────────────────────────
